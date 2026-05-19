@@ -1,6 +1,134 @@
 # Realtime Coaching Feed
 
-A production-minded full-stack realtime coaching feed built with Node.js, Express, MongoDB, Redis, Socket.IO, Next.js, and Tailwind CSS.
+A full-stack realtime coaching feed application where an admin can publish coaching updates and all connected users see them instantly without refreshing the page.
+
+This project demonstrates practical backend engineering, realtime communication, caching, database modeling, API design, and a responsive modern frontend.
+
+## Project Highlights
+
+- Realtime feed updates using Socket.IO
+- Admin page to publish new coaching updates
+- Home page that displays newest updates first
+- MongoDB database with Mongoose schema modeling
+- Redis caching for faster feed reads
+- Graceful fallback when Redis is unavailable
+- Duplicate feed prevention on realtime updates
+- Socket reconnect handling with automatic feed sync
+- Optimistic UI on admin submissions
+- Responsive UI built with Next.js and Tailwind CSS
+- Clean backend structure using routes, controllers, models, middleware, config, and sockets
+- Validation and error handling for production-style APIs
+
+## Tech Stack
+
+**Frontend**
+
+- Next.js
+- React
+- Tailwind CSS
+- Axios
+- Socket.IO Client
+- Day.js
+
+**Backend**
+
+- Node.js
+- Express.js
+- MongoDB
+- Mongoose
+- Redis
+- Socket.IO
+- Zod validation
+
+## Pages
+
+### Home Page
+
+URL:
+
+```txt
+http://localhost:3000
+```
+
+The home page shows all coaching updates in realtime. New updates appear automatically at the top of the feed.
+
+### Admin Page
+
+URL:
+
+```txt
+http://localhost:3000/admin
+```
+
+The admin page allows an authorized user or coach to create a new feed item. Once submitted, the update is saved in MongoDB and broadcast instantly to all connected clients.
+
+## How It Works
+
+### Realtime Flow
+
+1. A user opens the home page.
+2. The frontend connects to the backend using Socket.IO.
+3. The admin creates a new coaching update from the admin page.
+4. The backend saves the update in MongoDB.
+5. After the database write succeeds, the backend emits a `feed:created` event.
+6. All connected clients receive the new feed item instantly.
+7. The frontend merges the new item by MongoDB `_id` to prevent duplicates.
+8. If the socket reconnects, the frontend silently refetches the feed to recover missed updates.
+
+### Redis Caching Flow
+
+1. The frontend calls `GET /feed`.
+2. The backend checks Redis for cached feed data.
+3. If cached data exists, it returns the feed quickly from Redis.
+4. If cache is missing, the backend reads from MongoDB.
+5. MongoDB results are saved back into Redis with a TTL.
+6. When a new feed is created, the backend clears the Redis cache.
+7. If Redis is unavailable, the app continues working directly from MongoDB.
+
+## API Endpoints
+
+### `GET /feed`
+
+Returns all feed items, newest first.
+
+Example response:
+
+```json
+{
+  "source": "database",
+  "data": [
+    {
+      "_id": "665f1234567890",
+      "title": "Practice update",
+      "description": "Focus on quick transitions and communication today.",
+      "createdAt": "2026-05-19T08:30:00.000Z"
+    }
+  ]
+}
+```
+
+### `POST /feed`
+
+Creates a new feed item.
+
+Example body:
+
+```json
+{
+  "title": "Practice update",
+  "description": "Focus on quick transitions and communication today."
+}
+```
+
+## Database Schema
+
+```js
+Feed {
+  title: String,
+  description: String,
+  createdAt: Date
+}
+```
 
 ## Folder Structure
 
@@ -8,22 +136,22 @@ A production-minded full-stack realtime coaching feed built with Node.js, Expres
 realtime-coaching-feed/
   backend/
     src/
-      config/          MongoDB, Redis, and environment setup
-      controllers/     REST controller logic
-      middleware/      Validation and error middleware
+      config/          Database, Redis, and environment setup
+      controllers/     API business logic
+      middleware/      Error handling and validation middleware
       models/          Mongoose models
-      routes/          Express routes
-      sockets/         Socket.IO registration and emit helpers
+      routes/          Express route definitions
+      sockets/         Socket.IO logic
       utils/           Shared constants
-      validators/      Zod request schemas
-      app.js
-      server.js
+      validators/      Request validation schemas
+      app.js           Express app setup
+      server.js        HTTP and Socket.IO server
     .env.example
     package.json
   frontend/
-    app/               Next.js app routes
-      admin/           Admin publisher page
-      page.jsx         Home realtime feed page
+    app/
+      admin/           Admin page
+      page.jsx         Home feed page
     components/        Reusable UI components
     lib/               API and socket clients
     .env.local.example
@@ -32,35 +160,85 @@ realtime-coaching-feed/
   README.md
 ```
 
-## Installation
+## Local Setup
+
+### 1. Clone the Repository
 
 ```bash
+git clone https://github.com/Hasnen-ali/realtime-coaching-feed.git
 cd realtime-coaching-feed
+```
+
+### 2. Install Dependencies
+
+```bash
 npm install
 ```
 
-Create local environment files:
+### 3. Create Environment Files
+
+For backend:
 
 ```bash
 cp backend/.env.example backend/.env
+```
+
+For frontend:
+
+```bash
 cp frontend/.env.local.example frontend/.env.local
 ```
 
-Start MongoDB and Redis locally, or update the environment files with hosted URLs.
+On Windows PowerShell, you can use:
 
-Run both apps:
+```powershell
+Copy-Item backend\.env.example backend\.env
+Copy-Item frontend\.env.local.example frontend\.env.local
+```
+
+### 4. Start MongoDB
+
+Make sure MongoDB is running locally or update `backend/.env` with your MongoDB Atlas connection string.
+
+Default local connection:
+
+```env
+MONGODB_URI=mongodb://127.0.0.1:27017/coaching-feed
+```
+
+### 5. Start Redis
+
+Redis is recommended for caching, but the app still works if Redis is not running.
+
+Default local connection:
+
+```env
+REDIS_URL=redis://127.0.0.1:6379
+```
+
+### 6. Run the App
+
+Run backend:
+
+```bash
+npm run dev --workspace backend
+```
+
+Run frontend in a second terminal:
+
+```bash
+npm run dev --workspace frontend
+```
+
+Or run both together:
 
 ```bash
 npm run dev
 ```
 
-Open:
+## Environment Variables
 
-- Home feed: http://localhost:3000
-- Admin page: http://localhost:3000/admin
-- API health: http://localhost:5000/health
-
-## Backend Environment
+### Backend
 
 ```env
 NODE_ENV=development
@@ -73,78 +251,32 @@ RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=120
 ```
 
-## Frontend Environment
+### Frontend
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:5000
 NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
 ```
 
-## API
-
-### `GET /feed`
-
-Returns all feed items newest first.
-
-```json
-{
-  "source": "cache",
-  "data": [
-    {
-      "_id": "665f...",
-      "title": "Practice update",
-      "description": "Focus on transition speed today.",
-      "createdAt": "2026-05-19T08:30:00.000Z"
-    }
-  ]
-}
-```
-
-### `POST /feed`
-
-Creates a feed item, clears the Redis cache, and broadcasts a realtime update.
-
-```json
-{
-  "title": "Practice update",
-  "description": "Focus on transition speed today.",
-  "clientRequestId": "optional-client-generated-id"
-}
-```
-
-## Redis Caching Flow
-
-1. The home page calls `GET /feed`.
-2. The backend first checks Redis using the `feeds:all:v1` cache key.
-3. On a cache hit, the API returns the cached feed list immediately.
-4. On a cache miss, the API reads MongoDB, sorts by `createdAt` descending, stores the result in Redis with a TTL, and returns it.
-5. When `POST /feed` creates a new feed, the backend deletes the Redis key. The next `GET /feed` rebuilds the cache from MongoDB.
-6. If Redis is down, the app logs a warning and continues serving from MongoDB.
-
-## Socket.IO Realtime Flow
-
-1. The browser creates one shared Socket.IO client with reconnect enabled.
-2. Clients listen for `feed:created`.
-3. Admin submissions go through `POST /feed`; the server emits `feed:created` only after MongoDB confirms the write.
-4. The home page merges incoming feeds by MongoDB `_id`, which prevents duplicate realtime items.
-5. On connect or reconnect, the home page silently refetches `GET /feed` to reconcile anything missed while offline.
-6. Socket event listeners are removed during React cleanup to prevent duplicate handlers in development and route transitions.
-
-## Production Notes
-
-- Set `CLIENT_ORIGIN` to the deployed frontend URL.
-- Use MongoDB Atlas or a managed MongoDB cluster for production.
-- Use a managed Redis service with persistence and monitoring.
-- Keep `FEED_CACHE_TTL_SECONDS` short for highly active feeds.
-- Run the backend behind a reverse proxy or platform load balancer.
-- For multiple backend instances, configure a Socket.IO Redis adapter so websocket broadcasts reach clients connected to any instance.
-- Add authentication to `/admin` and `POST /feed` before exposing this publicly.
-
 ## Useful Commands
 
 ```bash
-npm run dev:backend
-npm run dev:frontend
-npm run start --workspace backend
+npm run dev
+npm run dev --workspace backend
+npm run dev --workspace frontend
 npm run build --workspace frontend
+npm run lint --workspace frontend
 ```
+
+## Production Notes
+
+- Protect the admin page with authentication before public deployment.
+- Use MongoDB Atlas or another managed MongoDB service in production.
+- Use a managed Redis service for reliable caching.
+- Configure a Socket.IO Redis adapter when running multiple backend instances.
+- Set `CLIENT_ORIGIN` to the deployed frontend URL.
+- Keep `.env` files private and never commit production secrets.
+
+## Author
+
+Developed by [Hasnen Ali](https://github.com/Hasnen-ali).
